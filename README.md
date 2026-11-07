@@ -53,27 +53,21 @@ No keys ship with this repository. The published production copy stays private, 
 
 Step 1: create the master image. The owner picks a saved listing or describes a product, reuses a saved anchor or creates a fresh anchor, and approves the master. The approved master carries the gold seal.
 
-![Step 1: master image approval](screenshots/01-master-image-approval.png)
 
 Step 2 output: the derived size cards. Each card shows its platform, its exact pixel size, its status in plain words, and a link to compare the card against the master image.
 
-![Derived size cards](screenshots/02-derived-size-cards.png)
 
 Asset mode with the caption assistant. The assistant drafts the caption in the owner's voice and lists each researched hashtag with the count the search verified, or states plainly when a count did not verify.
 
-![Asset mode with the caption assistant](screenshots/03-asset-mode-caption-assistant.png)
 
 The content calendar, month view. Status shows as a plain label and a border color: drafted, ready, posted.
 
-![Content calendar](screenshots/04-content-calendar.png)
 
 The assistant's weekly schedule planner. The assistant proposes a week of posts in the owner's voice, and the owner approves or edits each post before the post lands on the calendar.
 
-![Weekly schedule planner](screenshots/05-weekly-schedule-planner.png)
 
 The scheduled post list. Each post carries an Open in Asset Mode button, and the button opens the work screen prefilled for that post.
 
-![Scheduled posts with the jumpstart button](screenshots/06-scheduled-posts-jumpstart.png)
 
 ## Build record
 
