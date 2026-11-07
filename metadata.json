@@ -1,0 +1,6 @@
+{
+  "name": "Brand Builder",
+  "description": "Describe a product and visualize it with consistent studio-grade identity across billboards, print newspapers, social posts, and packaging mediums using Nano-Banana 2.1.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

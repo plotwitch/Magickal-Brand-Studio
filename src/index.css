@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Cinzel', 'Cormorant Garamond', Georgia, serif;
+    --font-serif: 'Cormorant Garamond', 'Fraunces', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --pw-night: #07040C;
+    --pw-night-elevated: #11091C;
+    --pw-plum: #1E0F30;
+    --pw-plum-deep: #2B1544;
+    --pw-teal: #00E5CC;
+    --pw-magenta: #EB238E;
+    --pw-gold: #D4AF37;
+    --pw-gold-bright: #F3D36B;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--pw-night);
+    background-image:
+      radial-gradient(ellipse 75% 55% at 12% 8%, rgba(43, 21, 68, 0.72) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 88% 16%, rgba(235, 35, 142, 0.16) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 55% at 50% 92%, rgba(0, 229, 204, 0.12) 0%, transparent 60%),
+      linear-gradient(180deg, #090510 0%, #12091E 50%, #07040C 100%);
+    background-attachment: fixed;
+    color: #F6F1FA;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-editorial {
+    font-family: var(--font-serif);
+  }
+
+  .font-mono-spec {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.btn-gold-glow {
+  background: linear-gradient(135deg, #E6C455 0%, #D4AF37 50%, #B88E1E 100%);
+  color: #09050F;
+  border: 1px solid #F7DF8B;
+  box-shadow:
+    0 0 18px rgba(212, 175, 55, 0.42),
+    0 0 36px rgba(212, 175, 55, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), opacity 150ms ease;
+}
+
+.btn-gold-glow:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 24px rgba(243, 211, 107, 0.65),
+    0 0 48px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.btn-gold-glow:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.tarot-card-frame {
+  background: linear-gradient(180deg, rgba(30, 15, 48, 0.92) 0%, rgba(13, 8, 22, 0.96) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  box-shadow:
+    0 16px 38px -10px rgba(0, 0, 0, 0.8),
+    0 0 22px rgba(212, 175, 55, 0.1),
+    inset 0 0 0 1px rgba(212, 175, 55, 0.15);
+}
+
+.result-image-frame {
+  border: 1px solid rgba(212, 175, 55, 0.72);
+  box-shadow:
+    0 10px 28px -6px rgba(0, 0, 0, 0.85),
+    0 0 16px rgba(212, 175, 55, 0.14);
+}

@@ -1,0 +1,139 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidStudioId(studioId) {
+      return studioId is string && studioId.size() >= 32 && studioId.size() <= 64 && studioId.matches('^[a-f0-9]+$');
+    }
+
+    function isValidStudioWorkspace(data, studioId) {
+      return data.keys().hasAll([
+        'studioId',
+        'activePresetId',
+        'activeTemplateId',
+        'isAnchorApproved',
+        'briefJson',
+        'canonicalSpecJson',
+        'copyDraftJson',
+        'presetsJson',
+        'listingsJson',
+        'scheduledPostsJson',
+        'mediumMetaJson',
+        'updatedIso'
+      ]) &&
+      data.keys().hasOnly([
+        'studioId',
+        'activePresetId',
+        'activeTemplateId',
+        'isAnchorApproved',
+        'briefJson',
+        'canonicalSpecJson',
+        'copyDraftJson',
+        'presetsJson',
+        'listingsJson',
+        'scheduledPostsJson',
+        'mediumMetaJson',
+        'updatedIso'
+      ]) &&
+      data.studioId is string && data.studioId == studioId &&
+      data.activePresetId is string && data.activePresetId.size() >= 1 && data.activePresetId.size() <= 128 &&
+      data.activeTemplateId is string && data.activeTemplateId.size() >= 1 && data.activeTemplateId.size() <= 128 &&
+      data.isAnchorApproved is bool &&
+      data.briefJson is string && data.briefJson.size() >= 2 && data.briefJson.size() <= 50000 &&
+      data.canonicalSpecJson is string && data.canonicalSpecJson.size() >= 2 && data.canonicalSpecJson.size() <= 50000 &&
+      data.copyDraftJson is string && data.copyDraftJson.size() >= 2 && data.copyDraftJson.size() <= 100000 &&
+      data.presetsJson is string && data.presetsJson.size() >= 2 && data.presetsJson.size() <= 200000 &&
+      data.listingsJson is string && data.listingsJson.size() >= 2 && data.listingsJson.size() <= 300000 &&
+      data.scheduledPostsJson is string && data.scheduledPostsJson.size() >= 2 && data.scheduledPostsJson.size() <= 400000 &&
+      data.mediumMetaJson is string && data.mediumMetaJson.size() >= 2 && data.mediumMetaJson.size() <= 100000 &&
+      data.updatedIso is string && data.updatedIso.size() >= 1 && data.updatedIso.size() <= 64;
+    }
+
+    function isValidImageChunk(data, studioId) {
+      return data.keys().hasAll([
+        'studioId',
+        'imageKey',
+        'chunkIndex',
+        'totalChunks',
+        'dataChunk',
+        'updatedIso'
+      ]) &&
+      data.keys().hasOnly([
+        'studioId',
+        'imageKey',
+        'chunkIndex',
+        'totalChunks',
+        'dataChunk',
+        'updatedIso'
+      ]) &&
+      data.studioId is string && data.studioId == studioId &&
+      data.imageKey is string && data.imageKey.size() >= 1 && data.imageKey.size() <= 128 && data.imageKey.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.chunkIndex is int && data.chunkIndex >= 0 && data.chunkIndex <= 64 &&
+      data.totalChunks is int && data.totalChunks >= 1 && data.totalChunks <= 64 &&
+      data.dataChunk is string && data.dataChunk.size() >= 1 && data.dataChunk.size() <= 700000 &&
+      data.updatedIso is string && data.updatedIso.size() >= 1 && data.updatedIso.size() <= 64;
+    }
+
+    // Boot connectivity check path
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Server-managed shared Brand Builder workspace
+    match /studios/{studioId} {
+      allow get: if isValidStudioId(studioId);
+      allow create: if isValidStudioId(studioId) && isValidStudioWorkspace(incoming(), studioId);
+      allow update: if isValidStudioId(studioId) &&
+        isValidStudioWorkspace(incoming(), studioId) &&
+        incoming().studioId == existing().studioId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'activePresetId',
+          'activeTemplateId',
+          'isAnchorApproved',
+          'briefJson',
+          'canonicalSpecJson',
+          'copyDraftJson',
+          'presetsJson',
+          'listingsJson',
+          'scheduledPostsJson',
+          'mediumMetaJson',
+          'updatedIso'
+        ]);
+
+      match /imageChunks/{chunkId} {
+        allow get: if isValidStudioId(studioId) && isValidId(chunkId);
+        allow list: if isValidStudioId(studioId) && existing().studioId == studioId;
+        allow create: if isValidStudioId(studioId) && isValidId(chunkId) && isValidImageChunk(incoming(), studioId);
+        allow update: if isValidStudioId(studioId) &&
+          isValidId(chunkId) &&
+          isValidImageChunk(incoming(), studioId) &&
+          incoming().studioId == existing().studioId &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'imageKey',
+            'chunkIndex',
+            'totalChunks',
+            'dataChunk',
+            'updatedIso'
+          ]);
+        allow delete: if isValidStudioId(studioId) && isValidId(chunkId);
+      }
+    }
+  }
+}

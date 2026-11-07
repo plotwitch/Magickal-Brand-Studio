@@ -1,0 +1,159 @@
+{
+  "entities": {
+    "StudioWorkspace": {
+      "title": "StudioWorkspace",
+      "description": "Shared Plot Witch Brand Builder workspace metadata, active campaign brief, canonical spec, and copy draft.",
+      "type": "object",
+      "properties": {
+        "studioId": {
+          "type": "string",
+          "description": "Cryptographic server-derived workspace identifier.",
+          "minLength": 32,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]+$"
+        },
+        "activePresetId": {
+          "type": "string",
+          "description": "ID of the currently active brand preset.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "activeTemplateId": {
+          "type": "string",
+          "description": "ID of the currently active product listing or template.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "isAnchorApproved": {
+          "type": "boolean",
+          "description": "Whether the current master product anchor image is approved."
+        },
+        "briefJson": {
+          "type": "string",
+          "description": "Serialized active campaign BrandBrief configuration.",
+          "minLength": 2,
+          "maxLength": 50000
+        },
+        "canonicalSpecJson": {
+          "type": "string",
+          "description": "Serialized CanonicalProductSpec for the active campaign.",
+          "minLength": 2,
+          "maxLength": 50000
+        },
+        "copyDraftJson": {
+          "type": "string",
+          "description": "Serialized AssetCopyDraft for the active workspace.",
+          "minLength": 2,
+          "maxLength": 100000
+        },
+        "presetsJson": {
+          "type": "string",
+          "description": "Serialized list of saved BrandPreset objects.",
+          "minLength": 2,
+          "maxLength": 200000
+        },
+        "listingsJson": {
+          "type": "string",
+          "description": "Serialized list of saved product listings (metadata and specs).",
+          "minLength": 2,
+          "maxLength": 300000
+        },
+        "scheduledPostsJson": {
+          "type": "string",
+          "description": "Serialized list of Content Calendar scheduled posts.",
+          "minLength": 2,
+          "maxLength": 400000
+        },
+        "mediumMetaJson": {
+          "type": "string",
+          "description": "Serialized metadata for generated medium sizes.",
+          "minLength": 2,
+          "maxLength": 100000
+        },
+        "updatedIso": {
+          "type": "string",
+          "description": "ISO timestamp of last save.",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "studioId",
+        "activePresetId",
+        "activeTemplateId",
+        "isAnchorApproved",
+        "briefJson",
+        "canonicalSpecJson",
+        "copyDraftJson",
+        "presetsJson",
+        "listingsJson",
+        "scheduledPostsJson",
+        "mediumMetaJson",
+        "updatedIso"
+      ]
+    },
+    "ImageChunk": {
+      "title": "ImageChunk",
+      "description": "Chunked image storage document for master anchor images and generated campaign sizes (stays well under the 1MB Firestore document limit).",
+      "type": "object",
+      "properties": {
+        "studioId": {
+          "type": "string",
+          "description": "Cryptographic server-derived workspace identifier.",
+          "minLength": 32,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]+$"
+        },
+        "imageKey": {
+          "type": "string",
+          "description": "Logical key for the image (e.g., anchor_main, medium_etsy_listing, listing_plot-witch-default).",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "chunkIndex": {
+          "type": "integer",
+          "description": "Zero-based index of this chunk."
+        },
+        "totalChunks": {
+          "type": "integer",
+          "description": "Total number of chunks for this imageKey."
+        },
+        "dataChunk": {
+          "type": "string",
+          "description": "Slice of data URL or path string (max 650,000 chars).",
+          "minLength": 1,
+          "maxLength": 700000
+        },
+        "updatedIso": {
+          "type": "string",
+          "description": "ISO timestamp of chunk write.",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "studioId",
+        "imageKey",
+        "chunkIndex",
+        "totalChunks",
+        "dataChunk",
+        "updatedIso"
+      ]
+    }
+  },
+  "firestore": {
+    "/studios/{studioId}": {
+      "schema": {
+        "$ref": "#/entities/StudioWorkspace"
+      },
+      "description": "Main server-managed shared workspace document storing presets, campaigns, listings metadata, and content calendar entries."
+    },
+    "/studios/{studioId}/imageChunks/{chunkId}": {
+      "schema": {
+        "$ref": "#/entities/ImageChunk"
+      },
+      "description": "Chunked image documents for master anchor images and generated medium sizes."
+    }
+  }
+}
