@@ -103,14 +103,33 @@ async function testFirestoreConnection(): Promise<boolean> {
   }
 }
 
-// Run boot connection test in background without blocking server listen
-testFirestoreConnection().catch(() => {});
+function getExpectedPassword(): string {
+  return typeof process.env.APP_PASSWORD === "string"
+    ? process.env.APP_PASSWORD
+    : "";
+}
 
 /**
- * Computes a deterministic 64-character hex studioId for the shared workspace in Firestore.
+ * Computes a deterministic 64-character hex studioId for the shared workspace in Firestore
+ * derived from the APP_PASSWORD secret using HMAC-SHA256 so the key cannot be computed from public values.
  * Matches ^[a-f0-9]{32,64}$ required by firestore.rules.
  */
 function getStudioId(): string {
+  const secretPassword = getExpectedPassword();
+  if (!secretPassword) {
+    throw new Error("APP_PASSWORD secret is required to compute the workspace key.");
+  }
+  return crypto
+    .createHmac("sha256", secretPassword)
+    .update("plot-witch-firestore-workspace-key-v2")
+    .digest("hex");
+}
+
+/**
+ * Computes the legacy workspace key that was previously derived from public Firebase config values.
+ * Used on first start with the new key to copy existing workspace data and image chunks to the new key.
+ */
+function getLegacyPublicStudioId(): string {
   const seed = `${firebaseConfig.projectId || "plot-witch"}:${
     firebaseConfig.appId || "brand-builder"
   }`;
@@ -194,11 +213,148 @@ interface CachedWorkspaceState {
 }
 
 let serverMemoryCache: CachedWorkspaceState | null = null;
+let legacyWorkspaceMigratedForKey: string | null = null;
+let migrationInFlightPromise: Promise<void> | null = null;
+
+/**
+ * On the first start with the new APP_PASSWORD-derived workspace key, copies existing
+ * workspace data and image chunks from the old public key to the new key if the new key
+ * does not yet exist in Firestore.
+ */
+async function migrateLegacyWorkspaceToNewKeyIfNeeded(): Promise<void> {
+  if (!getExpectedPassword()) {
+    return;
+  }
+
+  const newStudioId = getStudioId();
+  if (legacyWorkspaceMigratedForKey === newStudioId) {
+    return;
+  }
+
+  if (migrationInFlightPromise) {
+    await migrationInFlightPromise;
+    return;
+  }
+
+  migrationInFlightPromise = (async () => {
+    try {
+      const oldStudioId = getLegacyPublicStudioId();
+      if (newStudioId === oldStudioId) {
+        legacyWorkspaceMigratedForKey = newStudioId;
+        return;
+      }
+
+      const newStudioDocPath = `studios/${newStudioId}`;
+      let newSnap;
+      try {
+        newSnap = await getDocFromServer(doc(db, "studios", newStudioId));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, newStudioDocPath);
+      }
+
+      // If the new workspace document already exists, no copy is needed
+      if (newSnap.exists()) {
+        legacyWorkspaceMigratedForKey = newStudioId;
+        return;
+      }
+
+      const oldStudioDocPath = `studios/${oldStudioId}`;
+      let oldSnap;
+      try {
+        oldSnap = await getDocFromServer(doc(db, "studios", oldStudioId));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, oldStudioDocPath);
+      }
+
+      if (!oldSnap.exists()) {
+        legacyWorkspaceMigratedForKey = newStudioId;
+        return;
+      }
+
+      const oldData = oldSnap.data();
+
+      // Copy all image chunks from the old workspace key to the new workspace key
+      const oldChunksPath = `studios/${oldStudioId}/imageChunks`;
+      let oldChunksSnap;
+      try {
+        const q = query(
+          collection(db, "studios", oldStudioId, "imageChunks"),
+          where("studioId", "==", oldStudioId)
+        );
+        oldChunksSnap = await getDocs(q);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, oldChunksPath);
+      }
+
+      const nowIso = new Date().toISOString();
+
+      for (const chunkDoc of oldChunksSnap.docs) {
+        const c = chunkDoc.data();
+        if (!c?.imageKey || typeof c.dataChunk !== "string") continue;
+        const chunkId = chunkDoc.id;
+        const newChunkPath = `studios/${newStudioId}/imageChunks/${chunkId}`;
+        try {
+          await setDoc(doc(db, "studios", newStudioId, "imageChunks", chunkId), {
+            studioId: newStudioId,
+            imageKey: String(c.imageKey).slice(0, 128),
+            chunkIndex: Number(c.chunkIndex) || 0,
+            totalChunks: Number(c.totalChunks) || 1,
+            dataChunk: c.dataChunk,
+            updatedIso: String(c.updatedIso || nowIso).slice(0, 64),
+          });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, newChunkPath);
+        }
+      }
+
+      // Copy the main workspace document to the new workspace key with the exact same shape
+      const migratedWorkspacePayload = {
+        studioId: newStudioId,
+        activePresetId: String(oldData.activePresetId || "plot-witch-default").slice(0, 128),
+        activeTemplateId: String(oldData.activeTemplateId || "plot-witch-default").slice(0, 128),
+        isAnchorApproved:
+          typeof oldData.isAnchorApproved === "boolean" ? oldData.isAnchorApproved : true,
+        briefJson: String(oldData.briefJson || "{}").slice(0, 49000),
+        canonicalSpecJson: String(oldData.canonicalSpecJson || "{}").slice(0, 49000),
+        copyDraftJson: String(oldData.copyDraftJson || "{}").slice(0, 99000),
+        presetsJson: String(oldData.presetsJson || "[]").slice(0, 199000),
+        listingsJson: String(oldData.listingsJson || "[]").slice(0, 299000),
+        scheduledPostsJson: String(oldData.scheduledPostsJson || "[]").slice(0, 399000),
+        mediumMetaJson: String(oldData.mediumMetaJson || "{}").slice(0, 99000),
+        updatedIso: String(oldData.updatedIso || nowIso).slice(0, 64),
+      };
+
+      try {
+        await setDoc(doc(db, "studios", newStudioId), migratedWorkspacePayload);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, newStudioDocPath);
+      }
+
+      legacyWorkspaceMigratedForKey = newStudioId;
+      console.log("Migrated existing workspace data from legacy key to APP_PASSWORD-derived key.");
+    } finally {
+      migrationInFlightPromise = null;
+    }
+  })();
+
+  await migrationInFlightPromise;
+}
+
+// Run boot connection test and legacy workspace migration in background without blocking server listen
+testFirestoreConnection()
+  .then((connected) => {
+    if (connected) {
+      return migrateLegacyWorkspaceToNewKeyIfNeeded();
+    }
+  })
+  .catch(() => {});
 
 async function loadSharedStateFromFirestore(): Promise<{
   exists: boolean;
   state: CachedWorkspaceState | null;
 }> {
+  await migrateLegacyWorkspaceToNewKeyIfNeeded();
+
   const studioId = getStudioId();
   const studioDocPath = `studios/${studioId}`;
 
@@ -307,6 +463,8 @@ async function loadSharedStateFromFirestore(): Promise<{
 async function saveSharedStateToFirestore(
   partial: Partial<CachedWorkspaceState>
 ): Promise<CachedWorkspaceState> {
+  await migrateLegacyWorkspaceToNewKeyIfNeeded();
+
   const studioId = getStudioId();
 
   if (!serverMemoryCache) {
@@ -469,11 +627,6 @@ async function saveSharedStateToFirestore(
  * The server compares submitted passwords against process.env.APP_PASSWORD.
  * The browser never receives the real password; it only receives an opaque HMAC session token.
  */
-function getExpectedPassword(): string {
-  return typeof process.env.APP_PASSWORD === "string"
-    ? process.env.APP_PASSWORD
-    : "";
-}
 
 function computeSessionToken(secretPassword: string): string {
   return crypto
